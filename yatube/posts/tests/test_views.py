@@ -139,7 +139,7 @@ class PostTests(TestCase):
         self.assertEqual(response.context.get('post').image, self.post.image)
 
     def test_created_post_appears_on_related_pages(self):
-
+        cache.clear()
         response_group_post = self.authorized_client.get(
             reverse('posts:group_list', kwargs={'slug': self.group.slug}))
         self.assertEqual(len(response_group_post.context.get('page_obj')), 1)
