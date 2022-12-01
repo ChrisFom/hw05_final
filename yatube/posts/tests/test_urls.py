@@ -1,6 +1,6 @@
 # posts/tests/test_urls.py
 from django.test import TestCase, Client
-
+from django.core.cache import cache
 from ..models import Group, Post, User
 
 
@@ -72,6 +72,7 @@ class PostURLTests(TestCase):
             f'/posts/{self.post.id}/': 'posts/post_detail.html',
             '/create/': 'posts/create_post.html',
         }
+        cache.clear()
         for address, template in templates_url_names.items():
             with self.subTest(address=address):
                 response = self.authorized_client.get(address)
