@@ -1,0 +1,60 @@
+# post_detail.html
+{% extends 'base.html' %}
+{% load user_filters %}
+{% block title %} {{ post_title }} {% endblock %}
+{% block content %}
+{% load thumbnail %}
+<article>
+  <ul>
+    <li>
+      Автор: {{ post.author.username }}
+      <a href="{% url 'posts:profile' post.author %}">все посты пользователя</a>
+    </li>
+    <li>
+      Дата публикации: {{ post.pub_date|date:"d E Y" }}
+    </li>
+  </ul>
+
+  {% thumbnail post.image "960x339" upscale=True as im %}
+  <div class=figure>
+    <p><img src="{{ im.url }}"
+      width="500" height="339">
+  </div>
+  {% endthumbnail %}
+
+  <p>{{ post.text }}</p>
+  <a href="{% url 'posts:post_detail' post.pk %}">подробная информация</a>
+
+  <!-- Форма добавления комментария -->
+{% if user.is_authenticated %}
+  <div class="card my-4">
+    <h5 class="card-header">Добавить комментарий:</h5>
+    <div class="card-body">
+      <form method="post" action="{% url 'posts:add_comment' post.id %}">
+        {% csrf_token %}
+        <div class="form-group mb-2">
+          {{ form.text|addclass:"form-control" }}
+        </div>
+        <button type="submit" class="btn btn-primary">Отправить</button>
+      </form>
+    </div>
+  </div>
+{% endif %}
+{% for comment in comments %}
+  <div class="media mb-4">
+    <div class="media-body">
+      <h5 class="mt-0">
+        <a href="{% url 'posts:profile' comment.author.username %}">
+          {{ comment.author.username }}
+        </a>
+      </h5>
+      <p>
+        {{ comment.text }}
+      </p>
+    </div>
+  </div>
+{% endfor %}
+</article>
+
+{% endblock %}
+
