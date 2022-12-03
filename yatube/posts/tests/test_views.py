@@ -1,15 +1,23 @@
-from django.test import Client, TestCase
+import shutil
+import tempfile
+
 from django.urls import reverse
 from django import forms
+from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import Client, TestCase, override_settings
 from django.core.cache import cache
 from ..models import Post, Group, User, Follow
 
+TEMP_MEDIA_ROOT = tempfile.mkdtemp(dir=settings.BASE_DIR)
 
+
+@override_settings(MEDIA_ROOT=TEMP_MEDIA_ROOT)
 class PostTests(TestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
+        cache.clear()
         cls.user = User.objects.create_user(username='Petr')
         # Создадим запись в БД
         cls.group = Group.objects.create(
@@ -45,6 +53,11 @@ class PostTests(TestCase):
             group=cls.group,
             image=cls.uploaded,
         )
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        shutil.rmtree(TEMP_MEDIA_ROOT, ignore_errors=True)
 
     def setUp(self):
         # Создаем авторизованный клиент
@@ -157,15 +170,16 @@ class PostTests(TestCase):
         Post.objects.create(author=self.user,
                             text='Тестовый пост',
                             group=self.group)
+
         response = self.authorized_client.get(reverse('posts:index'))
         not_delete = response.content
         Post.objects.get(id=1).delete()
         response = self.authorized_client.get(reverse('posts:index'))
         after_delete = response.content
+        self.assertEqual(not_delete, after_delete)
         cache.clear()
         response = self.authorized_client.get(reverse('posts:index'))
         after_cache_clear = response.content
-        self.assertEqual(not_delete, after_delete)
         self.assertNotEqual(after_delete, after_cache_clear)
 
 
@@ -236,27 +250,40 @@ class FollowTests(TestCase):
         self.not_follower_client = Client()
         self.not_follower_client.force_login(FollowTests.not_follower)
 
-    def test_follow_index_show_correct_post(self):
-        """Новая запись пользователя появляется в ленте тех, кто
-        на него подписан и не появляется в ленте тех, кто не подписан."""
-        Follow.objects.create(
-            author=self.test_user,
-            user=self.follower
-        )
-        Post.objects.create(
-            text='test_one_post',
-            author=self.test_user
-        )
-        response_not_follower = self.not_follower_client. \
-            get(reverse('posts:follow_index'))
-        before_not_follower = len(response_not_follower.context["page_obj"])
-        response_follower = self.follower_client. \
-            get(reverse('posts:follow_index'))
-        before_follower = len(response_follower.context["page_obj"])
-        Post.objects.create(
-            text='test_one_post',
-            author=self.test_user)
-        after_not_follower = len(response_not_follower.context["page_obj"])
-        self.assertEqual(before_not_follower, after_not_follower)
-        after_follower = len(response_follower.context["page_obj"])
-        self.assertEqual(before_follower, after_follower)
+
+class FollowTest(TestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.post_autor = User.objects.create(username='autor')
+        cls.post_follower = User.objects.create(username='follower')
+        cls.post = Post.objects.create(text='Подпишись на меня',
+                                       author=cls.post_autor,)
+
+    def setUp(self):
+        self.authorized_client = Client()
+        self.authorized_client.force_login(self.post_follower)
+        self.follower_client = Client()
+        self.follower_client.force_login(self.post_autor)
+        cache.clear()
+
+    def test_follow_on_user(self):
+        """Проверка подписки на пользователя."""
+        count_follow = Follow.objects.count()
+        self.follower_client.post(
+            reverse('posts:profile_follow',
+                    kwargs={'username': self.post_follower}))
+        follow = Follow.objects.all().latest('id')
+        self.assertEqual(Follow.objects.count(), count_follow + 1)
+        self.assertEqual(follow.author_id, self.post_follower.id)
+        self.assertEqual(follow.user_id, self.post_autor.id)
+
+    def test_unfollow_on_user(self):
+        """Проверка отписки от пользователя."""
+        Follow.objects.create(user=self.post_autor,
+                              author=self.post_follower)
+        count_follow = Follow.objects.count()
+        self.follower_client.post(
+            reverse('posts:profile_unfollow',
+                    kwargs={'username': self.post_follower}))
+        self.assertEqual(Follow.objects.count(), count_follow - 1)

@@ -2,6 +2,7 @@
 from django.test import TestCase, Client
 from django.core.cache import cache
 from ..models import Group, Post, User
+from http import HTTPStatus
 
 
 class PostURLTests(TestCase):
@@ -41,17 +42,30 @@ class PostURLTests(TestCase):
                                    )
         self.authorized_client.force_login(author)
         response = self.authorized_client.get(f'/posts/{post.id}/edit/')
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
 
     def test_create_url_exists_at_desired_location(self):
         """Страница /create/ доступна авторизованному пользователю."""
         response = self.authorized_client.get('/create/')
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+
+    def test_create_follow_at_desired_location(self):
+        response = self.authorized_client.get('/follow/')
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+
+    def test_profile_follow_redirect(self):
+        response = self.authorized_client.get(f'/profile/{self.user}/follow/')
+        self.assertRedirects(response, (f'/profile/{self.user}/'))
+
+    def test_profile_unfollow_redirect(self):
+        response = self.authorized_client.get(f'/profile/'
+                                              f'{self.user}/unfollow/')
+        self.assertRedirects(response, (f'/profile/{self.user}/'))
 
     def test_unexist_page_url_exists_at_desired_location(self):
         """Страница /unexisting_page/ доступна авторизованному пользователю."""
         response = self.guest_client.get('/unexisting_page/')
-        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
 
     def test_post_create_redirect(self):
         response = self.guest_client.get('/create/', follow=True)
@@ -69,6 +83,7 @@ class PostURLTests(TestCase):
             '/': 'posts/index.html',
             '/group/test_slug/': 'posts/group_list.html',
             f'/profile/{self.user}/': 'posts/profile.html',
+            '/follow/': 'posts/follow.html',
             f'/posts/{self.post.id}/': 'posts/post_detail.html',
             '/create/': 'posts/create_post.html',
         }
@@ -82,10 +97,10 @@ class PostURLTests(TestCase):
         for url in self.public_urls:
             with self.subTest(url=url):
                 response = self.guest_client.get(url)
-                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.status_code, HTTPStatus.OK)
 
     def test_public_urls_auth_exists_at_desired_location(self):
         for url in self.public_urls:
             with self.subTest(url=url):
                 response = self.authorized_client.get(url)
-                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.status_code, HTTPStatus.OK)

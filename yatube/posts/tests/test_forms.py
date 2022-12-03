@@ -1,10 +1,19 @@
+import shutil
+import tempfile
+
 from ..models import Post, Group, User, Comment
-from django.test import Client, TestCase
+from django.test import Client, TestCase, override_settings
+from django.conf import settings
 from django.urls import reverse
 from http import HTTPStatus
+from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
 
 
+TEMP_MEDIA_ROOT = tempfile.mkdtemp(dir=settings.BASE_DIR)
+
+
+@override_settings(MEDIA_ROOT=TEMP_MEDIA_ROOT)
 class PostFormTests(TestCase):
     @classmethod
     def setUpClass(cls):
@@ -26,12 +35,18 @@ class PostFormTests(TestCase):
         )
 
         cls.uploaded = SimpleUploadedFile(
-            name='small.gif',
+            name='posts/small.gif',
             content=cls.small_gif,
             content_type='iamge/gif'
         )
 
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        shutil.rmtree(TEMP_MEDIA_ROOT, ignore_errors=True)
+
     def setUp(self):
+        cache.clear()
         self.guest_client = Client()
         self.authorized_client = Client()
         self.authorized_client.force_login(self.user)
@@ -61,7 +76,7 @@ class PostFormTests(TestCase):
         self.assertTrue(
             Post.objects.filter(
                 text=post.text,
-                image='posts/small.gif'
+                image='posts/' + form_data['image'].name
             ).exists())
 
     def test_edit_post(self):
