@@ -37,8 +37,7 @@ def profile(request, username):
     following = (request.user.is_authenticated
                  and request.user.follower.filter(author=author).exists()
                  )
-
-    posts = Post.objects.select_related('author').all()
+    posts = author.posts.select_related('author')
     count = author.posts.count()
     paginator = Paginator(posts, NUM_POSTS)
     page_number = request.GET.get('page')
