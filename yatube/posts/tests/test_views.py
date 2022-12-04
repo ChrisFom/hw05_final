@@ -167,13 +167,12 @@ class PostTests(TestCase):
                              get('page_obj')), 0)
 
     def test_response_cache_correct(self):
-        Post.objects.create(author=self.user,
-                            text='Тестовый пост',
-                            group=self.group)
 
         response = self.authorized_client.get(reverse('posts:index'))
+        post = response.context['page_obj'][0]
+        response = self.authorized_client.get(reverse('posts:index'))
         not_delete = response.content
-        Post.objects.get(id=1).delete()
+        post.delete()
         response = self.authorized_client.get(reverse('posts:index'))
         after_delete = response.content
         self.assertEqual(not_delete, after_delete)
@@ -232,23 +231,6 @@ class PaginatorViewsTest1(TestCase):
                     post_group_0 = first_object.group.title
                     self.assertEqual(post_author_0, 'auth')
                     self.assertEqual(post_group_0, 'Тестовая группа!')
-
-
-class FollowTests(TestCase):
-    @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
-        cls.test_user = User.objects.create_user(username="test-author")
-        cls.follower = User.objects.create_user(username='follower')
-        cls.not_follower = User.objects.create_user(username='not_follower')
-
-    def setUp(self) -> None:
-        self.test_user_client = Client()
-        self.test_user_client.force_login(FollowTests.test_user)
-        self.follower_client = Client()
-        self.follower_client.force_login(FollowTests.follower)
-        self.not_follower_client = Client()
-        self.not_follower_client.force_login(FollowTests.not_follower)
 
 
 class FollowTest(TestCase):
